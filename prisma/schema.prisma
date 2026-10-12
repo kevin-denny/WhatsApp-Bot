@@ -35,8 +35,28 @@ model Business {
   customers     Customer[]
   conversations Conversation[]
   messages      Message[]
+  faqs          FAQ[]
 
   @@map("businesses")
+}
+
+model FAQ {
+  id          String   @id @default(uuid()) @map("_id")
+  businessId  String
+  question    String
+  answer      String
+  keywords    String[] @default([])
+  category    String   @default("General")
+  priority    Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([businessId, active])
+  @@map("faqs")
 }
 
 model Customer {
