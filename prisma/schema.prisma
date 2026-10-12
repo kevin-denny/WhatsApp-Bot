@@ -1,0 +1,102 @@
+// Prisma schema file for WhatsApp FAQ Automation Platform
+// Multi-tenant architecture with mandatory businessId on all business-owned models
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ConversationMode {
+  BOT
+  HUMAN
+  CLOSED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+model Business {
+  id            String         @id @default(uuid()) @map("_id")
+  name          String
+  email         String?
+  phone         String?
+  status        String         @default("ACTIVE")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Multi-tenant relations
+  customers     Customer[]
+  conversations Conversation[]
+  messages      Message[]
+
+  @@map("businesses")
+}
+
+model Customer {
+  id            String         @id @default(uuid()) @map("_id")
+  businessId    String
+  phoneNumber   String
+  name          String?
+  firstSeen     DateTime       @default(now())
+  lastSeen      DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  business      Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  messages      Message[]
+
+  @@unique([businessId, phoneNumber], name: "unique_customer_per_business")
+  @@index([businessId])
+  @@index([phoneNumber])
+  @@map("customers")
+}
+
+model Conversation {
+  id          String           @id @default(uuid()) @map("_id")
+  businessId  String
+  customerId  String
+  status      String           @default("OPEN")
+  mode        ConversationMode @default(BOT)
+  currentNode String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  business    Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer    Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  messages    Message[]
+
+  @@index([businessId])
+  @@index([customerId])
+  @@index([businessId, status])
+  @@map("conversations")
+}
+
+model Message {
+  id             String           @id @default(uuid()) @map("_id")
+  businessId     String
+  conversationId String
+  customerId     String
+  direction      MessageDirection
+  message        String
+  type           String           @default("text")
+  wamId          String?          @unique // WhatsApp Message ID for idempotency and duplicate prevention
+  createdAt      DateTime         @default(now())
+
+  business       Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  customer       Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([conversationId])
+  @@index([customerId])
+  @@index([wamId])
+  @@map("messages")
+}
